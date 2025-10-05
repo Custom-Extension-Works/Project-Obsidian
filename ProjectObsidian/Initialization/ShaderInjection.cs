@@ -15,7 +15,7 @@ namespace Obsidian.Shaders
         public static readonly Uri Wireframe = new("resdb:///83aaa44a3da87c14713c65108b742676ca78516c30f39e33d00945db6801559d.unityshader");
         public static readonly Uri ObsidianTestShader = new("resdb:///65178a8353f8c164cd2c6dc5d07ad3f978157b023f52331b4a0ca2e34781162e.unityshader");
         public static readonly Uri ParallaxOcclusion = new("resdb:///93ae78de262e31f8299661725899aac61d96071ac2ebea8b76a5c56febfc3feb.unityshader");
-
+        public static readonly Uri GaussianBlur = new("resdb:///4c2cbf8646ec880f85cb30765dccc0f677faa8702561a5c61dcd484337e77dd6.unityshader");
         private static readonly List<Uri> Shaders = new()
         {
             ObsidianTestShader,
