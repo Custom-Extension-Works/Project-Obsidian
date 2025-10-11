@@ -12,25 +12,19 @@ using Awwdio;
 
 namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 {
-    public class AudioDelayProxy : ProtoFluxEngineProxy, Awwdio.IAudioDataSource, IWorldAudioDataSource
+    public class AudioDelayProxy : AudioProcessorNode1ProxyBase
     {
-        public IWorldAudioDataSource AudioInput;
-
         public int delayMilliseconds;
 
         public float feedback;
 
         public float DryWet;
 
-        public bool Active;
-
-        public bool IsActive => Active;
-
-        public int ChannelCount => AudioInput?.ChannelCount ?? 0;
+        public override int ChannelCount => AudioInput?.ChannelCount ?? 0;
 
         public DelayController _controller = new();
 
-        public void Read<S>(Span<S> buffer, AudioSimulator simulator) where S : unmanaged, IAudioSample<S>
+        public override void Read<S>(Span<S> buffer, AudioSimulator simulator)
         {
             lock (_controller)
             {
@@ -66,11 +60,8 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
     }
     [NodeName("Delay")]
     [NodeCategory("Obsidian/Audio/Effects")]
-    public class AudioDelay : ProxyVoidNode<FrooxEngineContext, AudioDelayProxy>, IExecutionChangeListener<FrooxEngineContext>
+    public class AudioDelay : AudioProcessorNode1Base<AudioDelayProxy>
     {
-        [ChangeListener]
-        public readonly ObjectInput<IWorldAudioDataSource> AudioInput;
-
         [ChangeListener]
         public readonly ValueInput<int> DelayMilliseconds;
 
@@ -80,86 +71,14 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
         [ChangeListener]
         public readonly ValueInput<float> DryWet;
 
-        public readonly ObjectOutput<IWorldAudioDataSource> AudioOutput;
-
-        private ObjectStore<Action<IChangeable>> _enabledChangedHandler;
-
-        private ObjectStore<SlotEvent> _activeChangedHandler;
-
-        public bool ValueListensToChanges { get; private set; }
-
-        private bool ShouldListen(AudioDelayProxy proxy)
-        {
-            if (proxy.Enabled)
-            {
-                return proxy.Slot.IsActive;
-            }
-            return false;
-        }
-
-        protected override void ProxyAdded(AudioDelayProxy proxy, FrooxEngineContext context)
-        {
-            base.ProxyAdded(proxy, context);
-            NodeContextPath path = context.CaptureContextPath();
-            ProtoFluxNodeGroup group = context.Group;
-            context.GetEventDispatcher(out var dispatcher);
-            Action<IChangeable> enabledHandler = delegate
-            {
-                dispatcher.ScheduleEvent(path, delegate (FrooxEngineContext c)
-                {
-                    UpdateListenerState(c);
-                });
-            };
-            SlotEvent activeHandler = delegate
-            {
-                dispatcher.ScheduleEvent(path, delegate (FrooxEngineContext c)
-                {
-                    UpdateListenerState(c);
-                });
-            };
-            proxy.EnabledField.Changed += enabledHandler;
-            proxy.Slot.ActiveChanged += activeHandler;
-            _enabledChangedHandler.Write(enabledHandler, context);
-            _activeChangedHandler.Write(activeHandler, context);
-            ValueListensToChanges = ShouldListen(proxy);
-            proxy.Active = ValueListensToChanges;
-        }
-
-        protected override void ProxyRemoved(AudioDelayProxy proxy, FrooxEngineContext context, bool inUseByAnotherInstance)
-        {
-            if (!inUseByAnotherInstance)
-            {
-                proxy.EnabledField.Changed -= _enabledChangedHandler.Read(context);
-                proxy.Slot.ActiveChanged -= _activeChangedHandler.Read(context);
-                _enabledChangedHandler.Clear(context);
-                _activeChangedHandler.Clear(context);
-                proxy.Active = false;
-            }
-        }
-
-        protected void UpdateListenerState(FrooxEngineContext context)
-        {
-            AudioDelayProxy proxy = GetProxy(context);
-            if (proxy != null)
-            {
-                bool shouldListen = ShouldListen(proxy);
-                if (shouldListen != ValueListensToChanges)
-                {
-                    ValueListensToChanges = shouldListen;
-                    context.Group.MarkChangeTrackingDirty();
-                    proxy.Active = shouldListen;
-                }
-            }
-        }
-
-        public void Changed(FrooxEngineContext context)
+        public override void Changed(FrooxEngineContext context)
         {
             AudioDelayProxy proxy = GetProxy(context);
             if (proxy == null)
             {
                 return;
             }
-            proxy.AudioInput = AudioInput.Evaluate(context);
+            base.Changed(context);
             proxy.delayMilliseconds = DelayMilliseconds.Evaluate(context);
             lock (proxy._controller)
             {
@@ -170,17 +89,6 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
             }
             proxy.feedback = Feedback.Evaluate(context);
             proxy.DryWet = DryWet.Evaluate(context);
-        }
-
-        protected override void ComputeOutputs(FrooxEngineContext context)
-        {
-            AudioDelayProxy proxy = GetProxy(context);
-            AudioOutput.Write(proxy, context);
-        }
-
-        public AudioDelay()
-        {
-            AudioOutput = new ObjectOutput<IWorldAudioDataSource>(this);
         }
     }
 }

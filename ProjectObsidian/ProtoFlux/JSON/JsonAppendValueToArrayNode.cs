@@ -12,8 +12,7 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Json;
 
 [NodeName("Append To Array")]
 [NodeCategory("Obsidian/Json")]
-[GenericTypes(typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long),
-    typeof(ulong), typeof(float), typeof(double))]
+[GenericTypes(typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong), typeof(float), typeof(double))]
 public class JsonAppendValueToArrayNode<T> : ObjectFunctionNode<FrooxEngineContext, JsonArray> where T : unmanaged
 {
     public readonly ObjectInput<JsonArray> Array;

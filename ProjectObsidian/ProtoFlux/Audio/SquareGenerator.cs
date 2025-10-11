@@ -10,7 +10,7 @@ using Awwdio;
 
 namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 {
-    public class SquareGeneratorProxy : ProtoFluxEngineProxy, Awwdio.IAudioDataSource, IWorldAudioDataSource
+    public class SquareGeneratorProxy : AudioGeneratorNodeProxyBase
     {
         public float Frequency;
 
@@ -24,15 +24,11 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 
         private float[] tempBuffer = null;
 
-        public bool Active;
-
-        public bool IsActive => Active;
-
-        public int ChannelCount => 1;
+        public override int ChannelCount => 1;
 
         private bool updateTime;
 
-        public void Read<S>(Span<S> buffer, AudioSimulator simulator) where S : unmanaged, IAudioSample<S>
+        public override void Read<S>(Span<S> buffer, AudioSimulator simulator)
         {
             if (!IsActive)
             {
@@ -86,7 +82,7 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
         }
     }
     [NodeCategory("Obsidian/Audio/Generators")]
-    public class SquareGenerator : ProxyVoidNode<FrooxEngineContext, SquareGeneratorProxy>, IExecutionChangeListener<FrooxEngineContext>
+    public class SquareGenerator : AudioGeneratorNodeBase<SquareGeneratorProxy>
     {
         [ChangeListener]
         [DefaultValueAttribute(440f)]
@@ -109,95 +105,18 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 
         public Continuation OnReset;
 
-        public readonly ObjectOutput<IWorldAudioDataSource> AudioOutput;
-
-        private ObjectStore<Action<IChangeable>> _enabledChangedHandler;
-
-        private ObjectStore<SlotEvent> _activeChangedHandler;
-
-        public bool ValueListensToChanges { get; private set; }
-
-        private bool ShouldListen(SquareGeneratorProxy proxy)
-        {
-            if (proxy.Enabled)
-            {
-                return proxy.Slot.IsActive;
-            }
-            return false;
-        }
-
-        protected override void ProxyAdded(SquareGeneratorProxy proxy, FrooxEngineContext context)
-        {
-            base.ProxyAdded(proxy, context);
-            NodeContextPath path = context.CaptureContextPath();
-            ProtoFluxNodeGroup group = context.Group;
-            context.GetEventDispatcher(out var dispatcher);
-            Action<IChangeable> enabledHandler = delegate
-            {
-                dispatcher.ScheduleEvent(path, delegate (FrooxEngineContext c)
-                {
-                    UpdateListenerState(c);
-                });
-            };
-            SlotEvent activeHandler = delegate
-            {
-                dispatcher.ScheduleEvent(path, delegate (FrooxEngineContext c)
-                {
-                    UpdateListenerState(c);
-                });
-            };
-            proxy.EnabledField.Changed += enabledHandler;
-            proxy.Slot.ActiveChanged += activeHandler;
-            _enabledChangedHandler.Write(enabledHandler, context);
-            _activeChangedHandler.Write(activeHandler, context);
-            ValueListensToChanges = ShouldListen(proxy);
-            proxy.Active = ValueListensToChanges;
-        }
-
-        protected override void ProxyRemoved(SquareGeneratorProxy proxy, FrooxEngineContext context, bool inUseByAnotherInstance)
-        {
-            if (!inUseByAnotherInstance)
-            {
-                proxy.EnabledField.Changed -= _enabledChangedHandler.Read(context);
-                proxy.Slot.ActiveChanged -= _activeChangedHandler.Read(context);
-                _enabledChangedHandler.Clear(context);
-                _activeChangedHandler.Clear(context);
-                proxy.Active = false;
-            }
-        }
-
-        protected void UpdateListenerState(FrooxEngineContext context)
-        {
-            SquareGeneratorProxy proxy = GetProxy(context);
-            if (proxy != null)
-            {
-                bool shouldListen = ShouldListen(proxy);
-                if (shouldListen != ValueListensToChanges)
-                {
-                    ValueListensToChanges = shouldListen;
-                    context.Group.MarkChangeTrackingDirty();
-                    proxy.Active = shouldListen;
-                }
-            }
-        }
-
-        public void Changed(FrooxEngineContext context)
+        public override void Changed(FrooxEngineContext context)
         {
             SquareGeneratorProxy proxy = GetProxy(context);
             if (proxy == null)
             {
                 return;
             }
+            base.Changed(context);
             proxy.Amplitude = Amplitude.Evaluate(context, 1f);
             proxy.Phase = Phase.Evaluate(context, 0f);
             proxy.Frequency = Frequency.Evaluate(context, 440f);
             proxy.PulseWidth = PulseWidth.Evaluate(context, 0.5f);
-        }
-
-        protected override void ComputeOutputs(FrooxEngineContext context)
-        {
-            SquareGeneratorProxy proxy = GetProxy(context);
-            AudioOutput.Write(proxy, context);
         }
 
         private IOperation DoReset(FrooxEngineContext context)
@@ -213,7 +132,6 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 
         public SquareGenerator()
         {
-            AudioOutput = new ObjectOutput<IWorldAudioDataSource>(this);
             Reset = new Operation(this, 0);
         }
     }

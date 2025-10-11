@@ -8,7 +8,7 @@ using Awwdio;
 
 namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 {
-    public class QuadCombinerProxy : ProtoFluxEngineProxy, Awwdio.IAudioDataSource, IWorldAudioDataSource
+    public class QuadCombinerProxy : AudioGeneratorNodeProxyBase
     {
         public IWorldAudioDataSource LeftFront;
 
@@ -18,13 +18,9 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
 
         public IWorldAudioDataSource RightRear;
 
-        public bool Active;
+        public override int ChannelCount => 4;
 
-        public bool IsActive => Active;
-
-        public int ChannelCount => 4;
-
-        public void Read<S>(Span<S> buffer, AudioSimulator simulator) where S : unmanaged, IAudioSample<S>
+        public override void Read<S>(Span<S> buffer, AudioSimulator simulator)
         {
             if (!IsActive)
             {
@@ -73,7 +69,7 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
         }
     }
     [NodeCategory("Obsidian/Audio")]
-    public class QuadCombiner : ProxyVoidNode<FrooxEngineContext, QuadCombinerProxy>, IExecutionChangeListener<FrooxEngineContext>
+    public class QuadCombiner : AudioGeneratorNodeBase<QuadCombinerProxy>
     {
         [ChangeListener]
         public readonly ObjectInput<IWorldAudioDataSource> LeftFront;
@@ -87,100 +83,18 @@ namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Audio
         [ChangeListener]
         public readonly ObjectInput<IWorldAudioDataSource> RightRear;
 
-        public readonly ObjectOutput<IWorldAudioDataSource> AudioOutput;
-
-        private ObjectStore<Action<IChangeable>> _enabledChangedHandler;
-
-        private ObjectStore<SlotEvent> _activeChangedHandler;
-
-        public bool ValueListensToChanges { get; private set; }
-
-        private bool ShouldListen(QuadCombinerProxy proxy)
-        {
-            if (proxy.Enabled)
-            {
-                return proxy.Slot.IsActive;
-            }
-            return false;
-        }
-
-        protected override void ProxyAdded(QuadCombinerProxy proxy, FrooxEngineContext context)
-        {
-            base.ProxyAdded(proxy, context);
-            NodeContextPath path = context.CaptureContextPath();
-            ProtoFluxNodeGroup group = context.Group;
-            context.GetEventDispatcher(out var dispatcher);
-            Action<IChangeable> enabledHandler = delegate
-            {
-                dispatcher.ScheduleEvent(path, delegate (FrooxEngineContext c)
-                {
-                    UpdateListenerState(c);
-                });
-            };
-            SlotEvent activeHandler = delegate
-            {
-                dispatcher.ScheduleEvent(path, delegate (FrooxEngineContext c)
-                {
-                    UpdateListenerState(c);
-                });
-            };
-            proxy.EnabledField.Changed += enabledHandler;
-            proxy.Slot.ActiveChanged += activeHandler;
-            _enabledChangedHandler.Write(enabledHandler, context);
-            _activeChangedHandler.Write(activeHandler, context);
-            ValueListensToChanges = ShouldListen(proxy);
-            proxy.Active = ValueListensToChanges;
-        }
-
-        protected override void ProxyRemoved(QuadCombinerProxy proxy, FrooxEngineContext context, bool inUseByAnotherInstance)
-        {
-            if (!inUseByAnotherInstance)
-            {
-                proxy.EnabledField.Changed -= _enabledChangedHandler.Read(context);
-                proxy.Slot.ActiveChanged -= _activeChangedHandler.Read(context);
-                _enabledChangedHandler.Clear(context);
-                _activeChangedHandler.Clear(context);
-                proxy.Active = false;
-            }
-        }
-
-        protected void UpdateListenerState(FrooxEngineContext context)
-        {
-            QuadCombinerProxy proxy = GetProxy(context);
-            if (proxy != null)
-            {
-                bool shouldListen = ShouldListen(proxy);
-                if (shouldListen != ValueListensToChanges)
-                {
-                    ValueListensToChanges = shouldListen;
-                    context.Group.MarkChangeTrackingDirty();
-                    proxy.Active = shouldListen;
-                }
-            }
-        }
-
-        public void Changed(FrooxEngineContext context)
+        public override void Changed(FrooxEngineContext context)
         {
             QuadCombinerProxy proxy = GetProxy(context);
             if (proxy == null)
             {
                 return;
             }
+            base.Changed(context);
             proxy.LeftFront = LeftFront.Evaluate(context);
             proxy.RightFront = RightFront.Evaluate(context);
             proxy.LeftRear = LeftRear.Evaluate(context);
             proxy.RightRear = RightRear.Evaluate(context);
-        }
-
-        protected override void ComputeOutputs(FrooxEngineContext context)
-        {
-            QuadCombinerProxy proxy = GetProxy(context);
-            AudioOutput.Write(proxy, context);
-        }
-
-        public QuadCombiner()
-        {
-            AudioOutput = new ObjectOutput<IWorldAudioDataSource>(this);
         }
     }
 }
