@@ -1,0 +1,21 @@
+using Elements.Core;
+using ProtoFlux.Core;
+using ProtoFlux.Runtimes.Execution;
+using FrooxEngine.ProtoFlux;
+
+namespace ProtoFlux.Runtimes.Execution.Nodes.Obsidian.Math
+{
+    [NodeName("Floor To Interval")]
+    [NodeCategory("Obsidian/Math")]
+    public class FloorToInterval_Float : ValueFunctionNode<FrooxEngineContext, float>
+    {
+        public ValueInput<float> Value;
+        public ValueInput<float> Interval;
+
+        protected override float Compute(FrooxEngineContext context)
+        {
+            float interval = Interval.Evaluate(context);
+            return MathX.Floor(Value.Evaluate(context) / interval) * interval;
+        }
+    }
+}
